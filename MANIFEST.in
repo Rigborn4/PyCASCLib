@@ -1,0 +1,3 @@
+include PyCASCLib/JCASC.jar
+recursive-include PyCASCLib/jdk *
+include PyCASCLib/jdk_path.txt
