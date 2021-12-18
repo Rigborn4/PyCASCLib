@@ -25,6 +25,7 @@ class JavaBuilder:
         self.jdk_path = None
         self.architecture = int(platform.architecture()[0][0:2])
         self.platform = platform.system().lower()
+        self.ext = '.zip' if self.platform == 'windows' else '.tar.gz'
 
     def load(self, jdk_path=None, java_version=16):
         if jdk_path is None or jdk_path == '':
@@ -36,20 +37,20 @@ class JavaBuilder:
             self.jdk_path = Path(os.getcwd(), 'jdk')
             self.download_jdk(url)
             self.download_jcasc()
-            JavaBuilder.remove_src_dirs()
-            JavaBuilder.move_jdk()
-            JavaBuilder.move_casc()
-            JavaBuilder.remove_casc_dir()
-            JavaBuilder.write_path('**')
+            self.remove_src_dirs()
+            self.move_jdk()
+            self.move_casc()
+            self.remove_casc_dir()
+            self.write_path('**')
         else:
             self.jdk_path = jdk_path
             self.version = java_version
             self.download_jcasc()
-            JavaBuilder.remove_casc_src()
-            JavaBuilder.move_casc()
-            JavaBuilder.remove_casc_dir()
+            self.remove_casc_src()
+            self.move_casc()
+            self.remove_casc_dir()
             if Path(self.jdk_path).exists():
-                JavaBuilder.write_path(Path(self.jdk_path))
+                self.write_path(Path(self.jdk_path))
             else:
                 raise FileNotFoundError('JDK path does not exist')
 
@@ -67,7 +68,7 @@ class JavaBuilder:
 
     def download_jdk(self, url: str):
         self.LOGGER.info('Downloading JDK')
-        filename = f'jdk.zip' if platform.system().lower() == 'windows' else f'jdk.tar.gz '
+        filename = 'jdk' + self.ext
         manager = enlighten.get_manager()
         req = requests.get(url, stream=True)
         assert req.status_code == 200, req.status_code
@@ -85,9 +86,9 @@ class JavaBuilder:
 
     def download_jcasc(self):
         self.LOGGER.info('Downloading JCASC')
-        filename = 'JCASC.zip'
+        filename = 'JCASC' + self.ext
         manager = enlighten.get_manager()
-        req = requests.get('https://github.com/DrSuperGood/JCASC/archive/refs/heads/master.zip', stream=True)
+        req = requests.get('https://github.com/DrSuperGood/JCASC/archive/refs/heads/master' + self.ext, stream=True)
         assert req.status_code == 200, req.status_code
         dlen = int(req.headers.get('Content-Length', 0)) or None
         with manager.counter(color='green', total=dlen and math.ceil(dlen / 2 ** 20), unit='MiB', leave=False,
@@ -108,7 +109,7 @@ class JavaBuilder:
 
     def extract_jcasc(self):
         self.LOGGER.info('Extracting JCASC')
-        filename = 'JCASC.zip'
+        filename = 'JCASC' + self.ext
         dest_name = 'JCASC'
         shutil.unpack_archive(filename, dest_name)
         for sub_dir in os.listdir(dest_name):
@@ -160,39 +161,33 @@ class JavaBuilder:
 
     def build_jar(self):
         self.LOGGER.info('Building Jar')
-        args = [Path(self.jdk_path, 'bin', 'jar.exe'), 'cfe', 'JCASC.jar',
+        args = [Path(self.jdk_path, 'bin', 'jar'), 'cfe', 'JCASC.jar',
                 "com.hiveworkshop.labs.WC3CASCExtractor",
                 '.']
         process = check_output(f'"{args[0]}" {args[1]} {args[2]} {args[3]} {args[4]}',
                                cwd=Path(os.getcwd(), 'JCASC', 'JCASC', 'src', 'bin'))
         self.LOGGER.info(process)
 
-    @classmethod
-    def move_casc(cls):
-        cls.LOGGER.info('Moving Casc')
+    def move_casc(self):
+        self.LOGGER.info('Moving Casc')
         os.replace(Path(os.getcwd(), 'JCASC', 'JCASC', 'src', 'bin', 'JCASC.jar'), Path(os.getcwd(), 'PyCASCLib',
                                                                                         'JCASC.jar'))
 
-    @classmethod
-    def move_jdk(cls):
-        cls.LOGGER.info('Moving JDK')
+    def move_jdk(self):
+        self.LOGGER.info('Moving JDK')
         root = Path('PyCASCLib')
         shutil.move('jdk', root)
 
-    @classmethod
-    def remove_src_dirs(cls):
-        os.remove('JCASC.zip')
-        os.remove(f'jdk.zip')
+    def remove_src_dirs(self):
+        os.remove('JCASC' + self.ext)
+        os.remove(f'jdk' + self.ext)
 
-    @classmethod
-    def remove_casc_src(cls):
-        os.remove('JCASC.zip')
+    def remove_casc_src(self):
+        os.remove('JCASC' + self.ext)
 
-    @classmethod
-    def remove_casc_dir(cls):
+    def remove_casc_dir(self):
         shutil.rmtree('JCASC', ignore_errors=True)
 
-    @classmethod
-    def write_path(cls, path):
+    def write_path(self, path):
         with open(Path('PyCASCLib', 'jdk_path.txt'), 'w') as f:
             f.write(str(path))
